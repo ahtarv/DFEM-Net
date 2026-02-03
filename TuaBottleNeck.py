@@ -1,3 +1,7 @@
+import torch
+import torch.nn as nn
+from TuaAttention import TuaAttention
+
 class TuaBottleneck(nn.Module):
     def __init__(self, c1, c2, shortcut = True, e=0.5):
         """
@@ -14,9 +18,9 @@ class TuaBottleneck(nn.Module):
         self.add = shortcut and c1 == c2 #only add residual if channels match
 
         #1. layer norms
-        #layernorm is ussually expect (n, h, w,c ) but image data is (N, C, H, W)
-        #we neeed a helper or use group norm which is friendlier to CNNs
-        #the paper says Layer norm so stricitly we should permute dimensions
+        #layernorm is usually expect (n, h, w,c ) but image data is (N, C, H, W)
+        #we need a helper or use group norm which is friendlier to CNNs
+        #the paper says Layer norm so strictly we should permute dimensions
         self.ln1 = nn.LayerNorm(c1)
         self.ln2 = nn.LayerNorm(c2)
 

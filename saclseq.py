@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Scalesq(nn.Module):
-    def __init__(self, c_p3, c_p4, c_p5, out_channels =256):
+class ScaleSeq(nn.Module):
+    def __init__(self, c_p3, c_p4, c_p5, out_channels=256):
         """
         c_p3, c_p4, c_p5: Input channels for the three feature maps
-        output_chanels: the fixed channel count for fusion(paper uses 256)
+        output_channels: the fixed channel count for fusion(paper uses 256)
         """
         super().__init__()
         self.conv_p3 = nn.Conv2d(c_p3, out_channels, kernel_size=1)
@@ -14,9 +14,9 @@ class Scalesq(nn.Module):
         self.conv_p5 = nn.Conv2d(c_p5, out_channels, kernel_size=1)
 
         #the 3d convolution
-        #input: (bathc, channel, depth = 3, height, width)
+        #input: (batch, channel, depth = 3, height, width)
         #kernel: (3,1,1) means we mix across all 3 scales(depth=3),
-        #but look at 1x1 pixels spaitally
+        #but look at 1x1 pixels spatially
         self.conv3d = nn.Conv3d(
             in_channels = out_channels,
             out_channels=out_channels,
@@ -36,11 +36,11 @@ class Scalesq(nn.Module):
         f4 = self.conv_p4(p4)
         f5 = self.conv_p5(p5)
 
-        target_h, targeta_w = f3.shape[2], f3.shape[3]
-        f4 = F.interpolate(f4, size=(target_h, target_w), mode = 'nearest')
-        f5 = F.interpolate(f5, size=(target_h, target_w), mode ='nearest')
+        target_h, target_w = f3.shape[2], f3.shape[3]
+        f4 = F.interpolate(f4, size=(target_h, target_w), mode='nearest')
+        f5 = F.interpolate(f5, size=(target_h, target_w), mode='nearest')
 
-        f_stacked = torch.stack([f3, f4, f4], dim=2)
+        f_stacked = torch.stack([f3, f4, f5], dim=2)
 
         y = self.conv3d(f_stacked)
         y = self.bn(y)
