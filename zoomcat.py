@@ -1,12 +1,15 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class Zoomcat(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
-        #we usually reduce channels in branches to keep computation manageable
-        reduced_c = in_channels // 2
-
-        #branch 1: large size(downsampling)
-        #downsampling is perfomed using a combination of max pooling and average pooling
-        self_conv_l = nn.Conv2d(in_channels, reduced_c, 1)
+        # FIX: Force int
+        in_channels = int(in_channels)
+        reduced_c = in_channels // 2 
+        
+        self.conv_l = nn.Conv2d(in_channels, reduced_c, 1)
         self.max_pool = nn.MaxPool2d(kernel_size = 2, stride = 2)
         self.avg_pool = nn.AvgPool2d(kernel_size=2, stride=2)
 

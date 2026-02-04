@@ -2,13 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class ScaleSeq(nn.Module):
-    def __init__(self, c_p3, c_p4, c_p5, out_channels=256):
-        """
-        c_p3, c_p4, c_p5: Input channels for the three feature maps
-        output_channels: the fixed channel count for fusion(paper uses 256)
-        """
+class Scalseq(nn.Module):
+    def __init__(self, ch):
         super().__init__()
+        # FIX: Ensure all channels are integers
+        c_p3, c_p4, c_p5 = int(ch[0]), int(ch[1]), int(ch[2])
+        out_channels = 256
         self.conv_p3 = nn.Conv2d(c_p3, out_channels, kernel_size=1)
         self.conv_p4 = nn.Conv2d(c_p4, out_channels, kernel_size=1)
         self.conv_p5 = nn.Conv2d(c_p5, out_channels, kernel_size=1)

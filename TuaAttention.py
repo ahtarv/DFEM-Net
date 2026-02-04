@@ -4,6 +4,8 @@ from dfem_parts import DeformableConv2d
 
 class TuaAttention(nn.Module):
     def __init__(self, in_channels):
+        super().__init__()
+        in_channels = int(in_channels)
 
         #Inital processing: Conv -> GELU [cite: 191, 192]
         self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=1)
