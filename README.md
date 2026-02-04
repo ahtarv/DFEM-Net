@@ -37,3 +37,47 @@ pip install torch torchvision
 
 # Install Ultralytics for YOLOv8 utilities
 pip install ultralytics
+
+
+## 🛠️ Implementation & Engineering Decisions
+
+To adapt the theoretical architecture of DFEM-Net (2026) for practical execution within the YOLOv8 framework and commodity hardware constraints (Intel i3 CPU), four key engineering deviations were made. These decisions balance mathematical fidelity with software stability and computational feasibility.
+
+### 1. The "Router" Architecture (YAML-Based Fusion)
+
+* **The Theory:** The paper conceptualizes `Scalseq` as a multi-input module that internally accepts layers  and handles resizing/fusion as a black box.
+* **The Challenge:** The strict YOLOv8 YAML parser does not natively support passing list objects (multiple tensors) to custom modules, leading to `ListIndex` errors during graph parsing.
+* **The Solution:** We implemented a "Router" approach. We moved the **Upsampling** and **Concatenation** operations out of the Python class and into the `dfem_net.yaml` configuration.
+* **Result:** The `Scalseq` module receives a single pre-concatenated tensor, preserving the mathematical operation while ensuring compatibility with the Ultralytics parsing engine.
+
+
+
+### 2. Nano-Scale Channel Adaptation
+
+* **The Theory:** The original architecture implies standard channel widths (likely 256/512 channels) suitable for `Small` or `Medium` model variants.
+* **The Challenge:** Running a full-width model with 3D Convolutions on an i3 CPU caused extreme latency (>30s) and memory pressure.
+* **The Solution:** We manually scaled the architecture to the **Nano (n)** scale, reducing channel widths by a factor of 0.25 (e.g., ).
+* **Result:** This reduced the computational load significantly, making the `Scalseq` 3D fusion feasible on CPU hardware (Latency: ~3.8s) while maintaining the structural integrity of the network.
+
+
+
+### 3. DCNv2 vs. DCNv3 (Deformable Convolutions)
+
+* **The Theory:** State-of-the-art implementations typically utilize **DCNv3**, which is highly optimized for GPU throughput and memory access.
+* **The Challenge:** DCNv3 requires custom CUDA kernel compilation, which is notoriously unstable on Windows CPU-only environments and creates a high barrier to entry for reproduction.
+* **The Solution:** We utilized `torchvision.ops.deform_conv2d` (DCNv2), a native PyTorch implementation.
+* **Result:** While computationally heavier (contributing to the 3.8s inference time), this guarantees "out-of-the-box" reproducibility without requiring complex C++ build tools.
+
+
+
+### 4. Dynamic Argument Parsing
+
+* **The Theory:** Research architectures typically assume static input dimensions.
+* **The Challenge:** The Ultralytics framework dynamically alters argument passing formats (integers vs. lists vs. tuples) depending on the model scale and layer context, causing brittle custom classes to crash.
+* **The Solution:** We engineered robust `*args` parsing logic in the `Scalseq` and `Zoomcat` modules. The classes dynamically inspect input types to correctly identify channel parameters regardless of the upstream parser format.
+* **Result:** The modules are "scale-invariant" and robust, preventing crashes if the model configuration or scaling factors are modified in the future.
+
+
+
+---
+
