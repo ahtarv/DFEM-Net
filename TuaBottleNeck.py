@@ -5,6 +5,8 @@ from TuaAttention import TuaAttention
 class TuaBottleneck(nn.Module):
     def __init__(self, c1, c2, shortcut=True, e=0.5):
         super().__init__()
+        with open("tua_debug.txt", "a") as f:
+            f.write(f"DEBUG: TuaBottleneck init called with c1={c1}, c2={c2}, shortcut={shortcut}, e={e}, type(c1)={type(c1)}, type(c2)={type(c2)}\n")
         # FIX: Force inputs to be integers
         c1 = int(c1)
         c2 = int(c2)

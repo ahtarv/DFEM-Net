@@ -1,36 +1,51 @@
-# dfem_net.yaml
-nc: 80  # number of classes
-scales: # model compound scaling constants (same as YOLOv8n)
-  n: [0.33, 0.25, 1024]
+# DFEM-Net Configuration (Scaled Explicitly for Nano)
+# Manual scaling applied (0.25 width) to prevent parser mismatches.
+
+nc: 80
+# REMOVED scales section to force explicit channel counts
 
 backbone:
   # [from, repeats, module, args]
-  - [-1, 1, Conv, [64, 3, 2]]  # 0-P1/2
-  - [-1, 1, Conv, [128, 3, 2]] # 1-P2/4
-  - [-1, 3, TuaBottleneck, [128, True]] # 2. REPLACED C2f with TuaBottleneck
-  - [-1, 1, Conv, [256, 3, 2]] # 3-P3/8
-  - [-1, 6, TuaBottleneck, [256, True]] # 4. REPLACED C2f with TuaBottleneck
-  - [-1, 1, Conv, [512, 3, 2]] # 5-P4/16
-  - [-1, 6, TuaBottleneck, [512, True]] # 6. REPLACED C2f with TuaBottleneck
-  - [-1, 1, Conv, [1024, 3, 2]] # 7-P5/32
-  - [-1, 3, TuaBottleneck, [1024, True]] # 8. REPLACED C2f with TuaBottleneck
-  - [-1, 1, SPPF, [1024, 5]]   # 9
+  # Manual Scaling: 64->16, 128->32, 256->64, 512->128, 1024->256
+  
+  - [-1, 1, Conv, [16, 3, 2]]  # 0-P1/2 (Was 64)
+  - [-1, 1, Conv, [32, 3, 2]]  # 1-P2/4 (Was 128)
+  - [-1, 3, TuaBottleneck, [32, 32, True]] # 2 (Was 128)
+  - [-1, 1, Conv, [64, 3, 2]]  # 3-P3/8 (Was 256)
+  - [-1, 6, TuaBottleneck, [64, 64, True]] # 4 (Was 256)
+  - [-1, 1, Conv, [128, 3, 2]] # 5-P4/16 (Was 512)
+  - [-1, 6, TuaBottleneck, [128, 128, True]] # 6 (Was 512)
+  - [-1, 1, Conv, [256, 3, 2]] # 7-P5/32 (Was 1024)
+  - [-1, 3, TuaBottleneck, [256, 256, True]] # 8 (Was 1024)
+  - [-1, 1, SPPF, [256, 5]]   # 9 (Was 1024)
 
 head:
+  # --- Upstream ---
   - [-1, 1, nn.Upsample, [None, 2, 'nearest']]
-  - [[-1, 6], 1, Concat, [1]]  # cat backbone P4
-  - [-1, 3, C2f, [512]]        # 12
+  - [[-1, 6], 1, Concat, [1]] 
+  - [-1, 3, C2f, [128]]        # 12 (Was 512)
 
   - [-1, 1, nn.Upsample, [None, 2, 'nearest']]
-  - [[-1, 4], 1, Concat, [1]]  # cat backbone P3
-  - [-1, 3, C2f, [256]]        # 15 (P3)
+  - [[-1, 4], 1, Concat, [1]]  
+  - [-1, 3, C2f, [64]]         # 15 (Was 256)
 
-  # --- INSERT SCALSEQ MODULE ---
-  # Takes P3 (15), P4 (12), and P5 (9)
-  - [[15, 12, 9], 1, Scalseq, [256, 512, 1024]] # 16
+  # --- ROUTER FIX (Upsampling Inputs) ---
+  - [12, 1, nn.Upsample, [None, 2, 'nearest']] # 16 (P4 up)
+  - [9, 1, nn.Upsample, [None, 4, 'nearest']]  # 17 (P5 up)
 
-  # --- INSERT ZOOMCAT MODULE ---
-  # Takes the fused features
-  - [-1, 1, Zoomcat, []] # 17
+  # 18. Concat P3(15), P4_up(16), P5_up(17)
+  # Channels: 64 + 128 + 256 = 448
+  - [[15, 16, 17], 1, Concat, [1]] 
 
-  - [[15, 12, 9], 1, Detect, [nc]] # Detect using P3, P4, P5
+  # --- SCALSEQ ---
+  # Args: [64, 128, 256] (Scaled P3, P4, P5)
+  - [18, 1, Scalseq, [64, 128, 256]] # 19
+
+  # --- ZOOMCAT ---
+  # Input channels is 64 (because Scalseq outputs 64)
+  # Note: Scalseq usually maintains the channel width of the smallest input (P3)
+  - [-1, 1, Zoomcat, [64]] # 20
+
+  # --- DETECT HEAD ---
+  # Using layers 15, 12, 9
+  - [[15, 12, 9], 1, Detect, [nc]]
