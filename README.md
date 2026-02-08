@@ -1,6 +1,3 @@
-Here is the updated `README.md`. I have kept your original text exactly as requested and appended the new **"Performance Optimization Study"** section right after the initial analysis.
-
-This structure tells the complete story: "Here is the paper implementation (slow), and here is how I engineered it to be fast."
 
 ---
 
