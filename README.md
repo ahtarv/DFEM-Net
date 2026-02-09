@@ -1,4 +1,5 @@
 
+---
 
 # DFEM-Net: Dynamic Adaptive Feature Extraction Network (Unofficial Implementation)
 
@@ -54,9 +55,35 @@ A key finding of this implementation is the significant "latency tax" imposed by
 | Model Variant | Hardware | Inference Time | Observation |
 | --- | --- | --- | --- |
 | Baseline YOLOv8n | i3-1215U (CPU) | ~80-120ms | Highly optimized for 2D kernels. |
-| **DFEM-Net (Nano)** | **i3-1215U (CPU)** | **3814ms** | **~38x increase** due to DCN & Conv3d. |
+| **DFEM-Net (Full)** | **i3-1215U (CPU)** | **3814ms** | **~38x increase** due to DCN & Conv3d. |
 
-**Engineering Insight:** While DFEM-Net provides superior receptive fields, its current form is best suited for GPU-accelerated environments where DCN and 3D kernels can be parallelized.
+**Engineering Insight:** While DFEM-Net provides superior receptive fields, its raw form is best suited for GPU-accelerated environments where DCN and 3D kernels can be parallelized.
+
+---
+
+## ⚡ Performance Optimization Study (DFEM-Net-Lite)
+
+To bridge the gap between research theory and edge deployment, I iteratively optimized the architecture to reduce computational complexity while maintaining the core "Receptive Field" and "Multi-Scale Fusion" objectives.
+
+### Optimization 1: Pseudo-3D Fusion (Neck)
+
+* **Constraint:** The `Conv3d` operation in `Scalseq` requires volumetric sliding windows, which are  in complexity and lack AVX2 optimization on CPUs.
+* **Solution:** Replaced the 3D stack with a **Channel Concatenation + 1x1 Conv2d** ("Pseudo-3D"). This flattens the operation into a highly optimized matrix multiplication, fusing features across scales instantly without the volumetric overhead.
+* **Result:** Latency dropped from **3.8s → 2.6s**.
+
+### Optimization 2: Dilated Receptive Fields (Backbone)
+
+* **Constraint:** `DeformableConv2d` requires calculating learned offsets for every pixel, causing non-contiguous memory access patterns (Cache Misses) on the CPU.
+* **Solution:** Replaced deformable layers with **Dilated Convolutions** (`dilation=2`). This mimics the "wider field of view" required by the paper using a fixed, sparse grid that allows for predictable memory pre-fetching.
+* **Result:** Latency dropped from **2.6s → 0.4s**.
+
+### 📉 Final Optimization Results
+
+| Version | Architecture Change | Inference Time | Speedup |
+| --- | --- | --- | --- |
+| **v1.0** | Full DFEM-Net (3D Conv + Deformable) | 3814.0 ms | Baseline |
+| **v1.1** | Pseudo-3D Fusion | 2639.8 ms | 1.4x Faster |
+| **v1.2** | **DFEM-Net-Lite** (Dilated + Pseudo-3D) | **418.5 ms** | **9.1x Faster** |
 
 ---
 
@@ -72,9 +99,9 @@ pip install torch torchvision ultralytics
 
 * `dfem_net.yaml`: The model blueprint defining the hybrid backbone/neck.
 * `TuaBottleNeck.py`: Implementation of the TuaNet backbone block.
-* `saclseq.py`: 3D feature fusion module.
+* `saclseq.py`: 3D feature fusion module (Optimized).
 * `zoomcat.py`: Triple-encoding feature booster.
-* `dfem_parts.py`: Helper classes for Deformable Convolutions.
+* `dfem_parts.py`: Helper classes for Deformable/Dilated Convolutions.
 * `main_full.py`: Entry point for model building and verification.
 
 ---
@@ -82,4 +109,3 @@ pip install torch torchvision ultralytics
 ## 📜 Acknowledgments
 
 Based on the paper: *"DFEM-Net: A dynamic adaptive feature extraction network..."* (2026). Implementation developed for research and educational purposes.
-
